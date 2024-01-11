@@ -1,14 +1,15 @@
 %global majorversion 0
 %global minorversion 3
-%global microversion 47
+%global microversion 67
 
 %global apiversion   0.3
 %global spaversion   0.2
 %global soversion    0
 %global libversion   %{soversion}.%(bash -c '((intversion = (%{minorversion} * 100) + %{microversion})); echo ${intversion}').0
+%global ms_version   0.4.2
 
 # For rpmdev-bumpspec and releng automation
-%global baserelease 4
+%global baserelease 2
 
 #global snapdate   20210107
 #global gitcommit  b17db2cebc1a5ab2c01851d29c05f79cd2f262bb
@@ -23,7 +24,12 @@
 # Build conditions for various features
 %bcond_without alsa
 %bcond_without vulkan
-%bcond_without v4l2
+
+%if (0%{?fedora} && 0%{?fedora} < 35)
+%bcond_without media_session
+%else
+%bcond_with media_session
+%endif
 
 # Features disabled for RHEL 8
 %if 0%{?rhel} && 0%{?rhel} < 9
@@ -48,6 +54,8 @@
 %bcond_without libcamera_plugin
 %endif
 
+%bcond_without v4l2
+
 Name:           pipewire
 Summary:        Media Sharing Server
 Version:        %{majorversion}.%{minorversion}.%{microversion}
@@ -60,23 +68,24 @@ Source0:        https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/%{git
 Source0:        https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/%{version}/pipewire-%{version}.tar.gz
 %endif
 
+%if %{with media-session}
+Source1:        https://gitlab.freedesktop.org/pipewire/media-session/-/archive/%{ms_version}/media-session-%{ms_version}.tar.gz
+%endif
+
 ## upstream patches
-Patch0001:	0001-spa-support-the-speakers-output-only-case-in-report_.patch
-Patch0002:      0001-v4l2-don-t-set-inotify-on-dev.patch
+Patch0001:	0001-v4l2-don-t-set-inotify-on-dev.patch
 
 ## upstreamable patches
 
 ## fedora patches
+%if %{with media-session}
+Patch1001:      0001-Build-media-session-from-local-tarbal.patch
+%endif
 
 ## rhel patches
-### Allow Meson < 0.59.0 to work for pipewire-jack
-### N.B.: Remove this patch once Meson is upgraded in RHEL
-Patch50001:     pipewire-jack-allow-old-meson.patch
-Patch50002:     0001-meson-drop-required-version.patch
-Patch50003:     0001-Revert-treewide-meson.build-use-feature.allowed.patch
 
 BuildRequires:  gettext
-BuildRequires:  meson >= 0.49.0
+BuildRequires:  meson >= 0.59.0
 BuildRequires:  gcc
 BuildRequires:  g++
 BuildRequires:  pkgconfig
@@ -99,6 +108,7 @@ BuildRequires:  pkgconfig(fdk-aac)
 BuildRequires:  pkgconfig(vulkan)
 %endif
 BuildRequires:  pkgconfig(bluez)
+BuildRequires:  systemd
 BuildRequires:  systemd-devel
 BuildRequires:  alsa-lib-devel
 BuildRequires:  libv4l-devel
@@ -111,9 +121,19 @@ BuildRequires:  ncurses-devel
 BuildRequires:  pulseaudio-libs-devel
 BuildRequires:  avahi-devel
 BuildRequires:  pkgconfig(webrtc-audio-processing) >= 0.2
-BuildRequires:  libusb-devel
+BuildRequires:  libusb1-devel
+#BuildRequires:  libunwind-devel
 BuildRequires:  readline-devel
+#BuildRequires:  lilv-devel
+BuildRequires:  openssl-devel
 BuildRequires:  libcanberra-devel
+#BuildRequires:  roc-toolkit-devel
+#BuildRequires:  openfec-devel
+BuildRequires:  libuv-devel
+BuildRequires:  speexdsp-devel
+#BuildRequires:  sox-devel
+#BuildRequires:  libmysofa-devel
+
 
 Requires(pre):  shadow-utils
 Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
@@ -172,6 +192,24 @@ Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
 %description utils
 This package contains command line utilities for the PipeWire media server.
 
+%if %{with media_session}
+%package media-session
+Summary:        PipeWire Media Session Manager
+License:        MIT
+Recommends:     %{name}%{?_isa} = %{version}-%{release}
+Obsoletes:      %{name}-libpulse < %{version}-%{release}
+# before 0.3.30-5 the session manager was in the main pipewire package
+Conflicts:      %{name}%{?_isa} < 0.3.30-5
+
+# Virtual Provides to support swapping between PipeWire session manager implementations
+Provides:       pipewire-session-manager
+Conflicts:      pipewire-session-manager
+
+%description media-session
+This package contains the reference Media Session Manager for the
+PipeWire media server.
+%endif
+
 %if %{with alsa}
 %package alsa
 Summary:        PipeWire media server ALSA support
@@ -196,7 +234,6 @@ This package contains an ALSA plugin for the PipeWire media server.
 Summary:        PipeWire JACK implementation
 License:        MIT
 Recommends:     %{name}%{?_isa} = %{version}-%{release}
-Requires:       %{name}-libjack%{?_isa} = %{version}-%{release}
 Conflicts:      jack-audio-connection-kit
 Conflicts:      jack-audio-connection-kit-dbus
 # Fixed jack subpackages
@@ -308,16 +345,32 @@ This package contains an LD_PRELOAD library that redirects v4l2 applications to
 PipeWire.
 %endif
 
+%package module-x11
+Summary:        PipeWire media server x11 support
+License:        MIT
+Recommends:     %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description module-x11
+This package contains X11 bell support for PipeWire.
+
 %prep
 %autosetup -p1 %{?snapdate:-n %{name}-%{gitcommit}}
+
+
+%if %{with media-session}
+mkdir subprojects/packagefiles
+cp %{SOURCE1} subprojects/packagefiles/
+%endif
 
 %build
 %meson \
     -D docs=enabled -D man=enabled -D gstreamer=enabled -D systemd=enabled	\
     -D gstreamer-device-provider=disabled -D sdl2=disabled 			\
     -D audiotestsrc=disabled -D videotestsrc=disabled				\
-    -D volume=disabled -D bluez5-codec-aptx=disabled -D roc=disabled 		\
-    -D raop=disabled -D lv2=disabled				 		\
+    -D volume=disabled -D bluez5-codec-aptx=disabled 		  		\
+    -D bluez5-codec-lc3plus=disabled -D roc=disabled -D x11-xfixes=disabled	\
+    -D lv2=disabled -D libmysofa=disabled					\
 %ifarch s390x
     -D bluez5-codec-ldac=disabled						\
 %endif
@@ -327,7 +380,8 @@ PipeWire.
     %{!?with_libcamera_plugin:-D libcamera=disabled} 				\
     %{?with_jack:-D jack-devel=true} 						\
     %{!?with_alsa:-D pipewire-alsa=disabled}					\
-    %{?with_vulkan:-D vulkan=enabled}
+    %{?with_vulkan:-D vulkan=enabled}						\
+    %{nil}
 %meson_build
 
 %install
@@ -339,6 +393,10 @@ echo %{_libdir}/pipewire-%{apiversion}/jack/ > %{buildroot}%{_sysconfdir}/ld.so.
 %else
 rm %{buildroot}%{_datadir}/pipewire/jack.conf
 
+%if %{with media_session}
+rm %{buildroot}%{_datadir}/pipewire/media-session.d/with-jack
+%endif
+
 %endif
 
 %if %{with alsa}
@@ -347,6 +405,11 @@ cp %{buildroot}%{_datadir}/alsa/alsa.conf.d/50-pipewire.conf \
         %{buildroot}%{_sysconfdir}/alsa/conf.d/50-pipewire.conf
 cp %{buildroot}%{_datadir}/alsa/alsa.conf.d/99-pipewire-default.conf \
         %{buildroot}%{_sysconfdir}/alsa/conf.d/99-pipewire-default.conf
+
+%if %{with media_session}
+touch %{buildroot}%{_datadir}/pipewire/media-session.d/with-alsa
+%endif
+
 %endif
 
 %if ! %{with pulse}
@@ -354,9 +417,17 @@ cp %{buildroot}%{_datadir}/alsa/alsa.conf.d/99-pipewire-default.conf \
 rm %{buildroot}%{_bindir}/pipewire-pulse
 rm %{buildroot}%{_userunitdir}/pipewire-pulse.*
 rm %{buildroot}%{_datadir}/pipewire/pipewire-pulse.conf
+
+%if %{with media_session}
+rm %{buildroot}%{_datadir}/pipewire/media-session.d/with-pulseaudio
+%endif
+
 %endif
 
 %find_lang %{name}
+%if %{with media_session}
+%find_lang media-session
+%endif
 
 # upstream should use udev.pc
 mkdir -p %{buildroot}%{_prefix}/lib/udev/rules.d
@@ -392,23 +463,89 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %systemd_user_post pipewire-pulse.socket
 %endif
 
+%if %{with media_session}
+%post media-session
+%systemd_user_post pipewire-media-session.service
+%endif
+
 %files
 %license LICENSE COPYING
-%doc README.md
+%doc README.md NEWS
 %{_userunitdir}/pipewire.*
+%{_userunitdir}/filter-chain.*
 %{_bindir}/pipewire
+%{_bindir}/pipewire-avb
+%{_bindir}/pipewire-aes67
 %{_mandir}/man1/pipewire.1*
 %dir %{_datadir}/pipewire/
 %{_datadir}/pipewire/pipewire.conf
 %{_datadir}/pipewire/minimal.conf
+%{_datadir}/pipewire/filter-chain.conf
 %{_datadir}/pipewire/filter-chain/*.conf
+%{_datadir}/pipewire/pipewire-avb.conf
+%{_datadir}/pipewire/pipewire-aes67.conf
 %{_mandir}/man5/pipewire.conf.5*
+%config(noreplace) %{_sysconfdir}/security/limits.d/*.conf
+
+%if %{with media_session}
+%files media-session -f media-session.lang
+%{_bindir}/pipewire-media-session
+%{_userunitdir}/pipewire-media-session.service
+%dir %{_datadir}/pipewire/media-session.d/
+%{_datadir}/pipewire/media-session.d/alsa-monitor.conf
+%{_datadir}/pipewire/media-session.d/bluez-monitor.conf
+%{_datadir}/pipewire/media-session.d/media-session.conf
+%{_datadir}/pipewire/media-session.d/v4l2-monitor.conf
+
+%if %{with alsa}
+%{_datadir}/pipewire/media-session.d/with-alsa
+%endif
+%if %{with jack}
+%{_datadir}/pipewire/media-session.d/with-jack
+%endif
+%if %{with pulse}
+%{_datadir}/pipewire/media-session.d/with-pulseaudio
+%endif
+
+%endif
 
 %files libs -f %{name}.lang
 %license LICENSE COPYING
 %doc README.md
 %{_libdir}/libpipewire-%{apiversion}.so.*
-%{_libdir}/pipewire-%{apiversion}/libpipewire-*.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-access.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-adapter.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-avb.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-client-device.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-client-node.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-combine-stream.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-echo-cancel.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-fallback-sink.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-filter-chain.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-link-factory.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-loopback.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-metadata.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-pipe-tunnel.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-portal.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-profiler.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-protocol-native.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-protocol-pulse.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-protocol-simple.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-pulse-tunnel.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-raop-discover.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-raop-sink.so
+#%{_libdir}/pipewire-%{apiversion}/libpipewire-module-roc-sink.so
+#%{_libdir}/pipewire-%{apiversion}/libpipewire-module-roc-source.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-rtkit.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-rtp-sink.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-rtp-source.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-rt.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-session-manager.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-spa-device-factory.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-spa-device.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-spa-node-factory.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-spa-node.so
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-zeroconf-discover.so
 %dir %{_datadir}/alsa-card-profile/
 %dir %{_datadir}/alsa-card-profile/mixer/
 %{_datadir}/alsa-card-profile/mixer/paths/
@@ -421,6 +558,7 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_libdir}/spa-%{spaversion}/alsa/
 %{_libdir}/spa-%{spaversion}/audioconvert/
 %{_libdir}/spa-%{spaversion}/audiomixer/
+%{_libdir}/spa-%{spaversion}/avb/
 %{_libdir}/spa-%{spaversion}/bluez5/
 %{_libdir}/spa-%{spaversion}/control/
 %{_libdir}/spa-%{spaversion}/support/
@@ -443,6 +581,7 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_libdir}/pkgconfig/libspa-%{spaversion}.pc
 
 %files doc
+%doc README.md NEWS
 %{_datadir}/doc/pipewire/html
 
 %files utils
@@ -456,6 +595,7 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_bindir}/pw-dot
 %{_bindir}/pw-cat
 %{_bindir}/pw-dump
+%{_bindir}/pw-encplay
 %{_bindir}/pw-link
 %{_bindir}/pw-loopback
 %{_bindir}/pw-play
@@ -467,9 +607,11 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_mandir}/man1/pw-cli.1*
 %{_mandir}/man1/pw-cat.1*
 %{_mandir}/man1/pw-dot.1*
+%{_mandir}/man1/pw-link.1*
 %{_mandir}/man1/pw-metadata.1*
 %{_mandir}/man1/pw-mididump.1*
 %{_mandir}/man1/pw-profiler.1*
+%{_mandir}/man1/pw-top.1*
 
 %{_bindir}/spa-acp-tool
 %{_bindir}/spa-inspect
@@ -529,14 +671,17 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_libdir}/pipewire-%{apiversion}/v4l2/libpw-v4l2.so
 %endif
 
-%changelog
-* Tue Aug 01 2023 Wim Taymans <wtaymans@redhat.com> - 0.3.47-4
-- Add patch for removing inotify on /dev
-  Resolves: rhbz#2228083
+%files module-x11
+%{_libdir}/pipewire-%{apiversion}/libpipewire-module-x11-bell.so
 
-* Thu Mar 02 2023 Wim Taymans <wtaymans@redhat.com> - 0.3.47-3
-- Add patch for jack detection.
-  Resolves: rhbz#2180869
+%changelog
+* Tue Aug 01 2023 Wim Taymans <wtaymans@redhat.com> - 0.3.67-2
+- Add patch for removing inotify on /dev
+- Resolves: rhbz#2221868
+
+* Wed Mar 22 2023 Wim Taymans <wtaymans@redhat.com> - 0.3.67-1
+- Update to 0.3.67
+- Resolves: rhbz#2176829
 
 * Fri Mar 11 2022 Wim Taymans <wtaymans@redhat.com> - 0.3.47-2
 - Add pulseaudio-utils as Requires for pipewire-pulseaudio
