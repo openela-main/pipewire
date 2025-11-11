@@ -1,6 +1,6 @@
 %global majorversion 1
-%global minorversion 2
-%global microversion 7
+%global minorversion 4
+%global microversion 6
 
 %global apiversion   0.3
 %global spaversion   0.2
@@ -40,11 +40,13 @@
 %bcond_with libmysofa
 %bcond_with lv2
 %bcond_with roc
+%bcond_with ebur128
 %else
 %bcond_without jackserver_plugin
 %bcond_without libmysofa
 %bcond_without lv2
 %bcond_without roc
+%bcond_without ebur128
 %endif
 
 %if 0%{?rhel} || ("%{_arch}" == "s390x")
@@ -127,9 +129,11 @@ BuildRequires:  libcanberra-devel
 BuildRequires:  libuv-devel
 BuildRequires:  speexdsp-devel
 BuildRequires:  systemd-rpm-macros
-%{?sysusers_requires_compat}
+%if %{with ebur128}
+BuildRequires:  libebur128-devel
+%endif
+BuildRequires:  fftw-devel
 
-Requires(pre):  shadow-utils
 Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
 Requires:       systemd
 Requires:       rtkit
@@ -137,6 +141,8 @@ Requires:       rtkit
 Requires:       pipewire-session-manager
 # Prefer WirePlumber for session manager
 Suggests:       wireplumber
+# Bring in libcamera plugin for MIPI / complex camera support
+Recommends:     pipewire-plugin-libcamera
 
 %description
 PipeWire is a multimedia server for Linux and other Unix like operating
@@ -211,9 +217,7 @@ Summary:        PipeWire JACK implementation libraries
 License:        MIT
 Recommends:     %{name}%{?_isa} = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
-%if 0%{?rhel}
 Requires:       %{name}-jack-audio-connection-kit%{?_isa} = %{version}-%{release}
-%endif
 # Fixed jack subpackages
 Conflicts:      %{name}-libjack < 0.3.13-6
 Conflicts:      %{name}-jack-audio-connection-kit < 0.3.13-6
@@ -230,8 +234,6 @@ Summary:        PipeWire JACK implementation
 License:        MIT
 Recommends:     %{name}%{?_isa} = %{version}-%{release}
 Requires:       %{name}-jack-audio-connection-kit-libs%{?_isa} = %{version}-%{release}
-Conflicts:      jack-audio-connection-kit
-Conflicts:      jack-audio-connection-kit-dbus
 # Replaces libjack subpackage
 %if ! (0%{?fedora} && 0%{?fedora} < 34)
 # Ensure this is provided by default to route all audio
@@ -408,6 +410,33 @@ Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
 This package contains the mysofa support for PipeWire filter-chain.
 %endif
 
+%package config-rates
+Summary:        PipeWire media server multirate configuration
+License:        MIT
+Recommends:     %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description config-rates
+This package contains the configuration files to support multiple
+sample rates.
+
+%package config-upmix
+Summary:        PipeWire media server upmixing configuration
+License:        MIT
+Recommends:     %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description config-upmix
+This package contains the configuration files to support upmixing.
+
+%package config-raop
+Summary:        PipeWire configuration enabling the raop module
+License:        MIT
+Recommends:     %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description config-raop
+This package contains the configuration file to enable the RAOP module.
 
 %prep
 %autosetup -p1 %{?snapdate:-n %{name}-%{gitcommit}}
@@ -441,6 +470,7 @@ cp %{SOURCE1} subprojects/packagefiles/
     %{!?with_lv2:-D lv2=disabled}						\
     %{!?with_roc:-D roc=disabled}						\
     %{!?with_ffado:-D libffado=disabled}					\
+    %{!?with_ebur128:-D ebur128=disabled}					\
     %{nil}
 %meson_build
 
@@ -450,6 +480,7 @@ install -p -D -m 0644 %{SOURCE1} %{buildroot}%{_sysusersdir}/pipewire.conf
 
 # Own this directory so add-ons can use it
 install -d -m 0755 %{buildroot}%{_datadir}/pipewire/pipewire.conf.d/
+install -d -m 0755 %{buildroot}%{_datadir}/pipewire/client.conf.d/
 
 %if %{with jack}
 mkdir -p %{buildroot}%{_sysconfdir}/ld.so.conf.d/
@@ -479,7 +510,24 @@ rm %{buildroot}%{_datadir}/pipewire/pipewire-pulse.conf
 %if %{with pulse}
 # Own this directory so add-ons can use it
 install -d -m 0755 %{buildroot}%{_datadir}/pipewire/pipewire-pulse.conf.d/
+
+ln -s ../pipewire-pulse.conf.avail/20-upmix.conf \
+		%{buildroot}%{_datadir}/pipewire/pipewire-pulse.conf.d/20-upmix.conf
 %endif
+
+# rates config
+ln -s ../pipewire.conf.avail/10-rates.conf \
+		%{buildroot}%{_datadir}/pipewire/pipewire.conf.d/10-rates.conf
+
+# upmix config
+ln -s ../pipewire.conf.avail/20-upmix.conf \
+		%{buildroot}%{_datadir}/pipewire/pipewire.conf.d/20-upmix.conf
+ln -s ../client.conf.avail/20-upmix.conf \
+		%{buildroot}%{_datadir}/pipewire/client.conf.d/20-upmix.conf
+
+# raop config
+ln -s ../pipewire.conf.avail/50-raop.conf \
+		%{buildroot}%{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %find_lang %{name}
 
@@ -490,8 +538,6 @@ echo "test failed"
 %{!?tests_nonfatal:exit $TESTS_ERROR}
 fi
 
-%pre
-%sysusers_create_compat %{SOURCE1}
 
 %post
 %systemd_user_post pipewire.service
@@ -524,6 +570,7 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf
 %{_datadir}/pipewire/pipewire.conf.avail/10-rates.conf
 %{_datadir}/pipewire/pipewire.conf.avail/20-upmix.conf
+%{_datadir}/pipewire/pipewire.conf.avail/50-raop.conf
 %{_datadir}/pipewire/minimal.conf
 %{_datadir}/pipewire/filter-chain.conf
 %{_datadir}/pipewire/filter-chain/*.conf
@@ -592,13 +639,19 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_libdir}/spa-%{spaversion}/avb/
 %{_libdir}/spa-%{spaversion}/bluez5/
 %{_libdir}/spa-%{spaversion}/control/
+%{_libdir}/spa-%{spaversion}/filter-graph/libspa-filter-graph.so
+%{_libdir}/spa-%{spaversion}/filter-graph/libspa-filter-graph-plugin-builtin.so
+%if %{with ebur128}
+%{_libdir}/spa-%{spaversion}/filter-graph/libspa-filter-graph-plugin-ebur128.so
+%endif
+%{_libdir}/spa-%{spaversion}/filter-graph/libspa-filter-graph-plugin-ladspa.so
 %{_libdir}/spa-%{spaversion}/support/
 %{_libdir}/spa-%{spaversion}/v4l2/
 %{_libdir}/spa-%{spaversion}/videoconvert/
+%{_libdir}/spa-%{spaversion}/libspa.so
 %{_datadir}/pipewire/client.conf
+%dir %{_datadir}/pipewire/client.conf.d/
 %{_datadir}/pipewire/client.conf.avail/20-upmix.conf
-%{_datadir}/pipewire/client-rt.conf
-%{_datadir}/pipewire/client-rt.conf.avail/20-upmix.conf
 %{_mandir}/man5/pipewire-client.conf.5.gz
 %{_mandir}/man7/pipewire-props.7.gz
 %{_mandir}/man7/libpipewire-module-access.7.gz
@@ -638,6 +691,10 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_mandir}/man7/libpipewire-module-rtp-session.7.gz
 %{_mandir}/man7/libpipewire-module-rtp-sink.7.gz
 %{_mandir}/man7/libpipewire-module-rtp-source.7.gz
+%{_mandir}/man7/libpipewire-module-spa-device-factory.7.gz
+%{_mandir}/man7/libpipewire-module-spa-device.7.gz
+%{_mandir}/man7/libpipewire-module-spa-node-factory.7.gz
+%{_mandir}/man7/libpipewire-module-spa-node.7.gz
 %{_mandir}/man7/libpipewire-module-session-manager.7.gz
 %{_mandir}/man7/libpipewire-module-snapcast-discover.7.gz
 %{_mandir}/man7/libpipewire-module-vban-recv.7.gz
@@ -737,6 +794,7 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_libdir}/pipewire-%{apiversion}/jack/libjacknet.so
 %{_libdir}/pipewire-%{apiversion}/jack/libjackserver.so
 %{_libdir}/pkgconfig/jack.pc
+%{_libdir}/pkgconfig/jackserver.pc
 %endif
 
 %if %{with jackserver_plugin}
@@ -827,15 +885,32 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 
 %if %{with libmysofa}
 %files module-filter-chain-sofa
-%{_libdir}/pipewire-%{apiversion}/libpipewire-module-filter-chain-sofa.so
+%{_libdir}/spa-%{spaversion}/filter-graph/libspa-filter-graph-plugin-sofa.so
 %endif
 
 %if %{with lv2}
 %files module-filter-chain-lv2
-%{_libdir}/pipewire-%{apiversion}/libpipewire-module-filter-chain-lv2.so
+%{_libdir}/spa-%{spaversion}/filter-graph/libspa-filter-graph-plugin-lv2.so
 %endif
 
+%files config-rates
+%{_datadir}/pipewire/pipewire.conf.d/10-rates.conf
+
+%files config-upmix
+%{_datadir}/pipewire/pipewire.conf.d/20-upmix.conf
+%{_datadir}/pipewire/client.conf.d/20-upmix.conf
+%if %{with pulse}
+%{_datadir}/pipewire/pipewire-pulse.conf.d/20-upmix.conf
+%endif
+
+%files config-raop
+%{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
+
 %changelog
+* Mon Jun 30 2025 Wim Taymans <wtaymans@redhat.com> - 1.4-6-1
+- Update version to 1.4.6
+  Resolves: DESKTOP-1857
+
 * Thu Jan 23 2025 Wim Taymans <wtaymans@redhat.com> - 1.2.7-1
 - Update version to 1.2.7
 - Resolves: RHEL-76017
