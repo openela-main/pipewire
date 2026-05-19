@@ -1,6 +1,6 @@
 %global majorversion 1
 %global minorversion 4
-%global microversion 6
+%global microversion 9
 
 %global apiversion   0.3
 %global spaversion   0.2
@@ -907,6 +907,10 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %changelog
+* Fri Nov 21 2025 Wim Taymans <wtaymans@redhat.com> - 1.4.9-1
+- Rebase to 1.4.9
+  Resolves: RHEL-129575
+
 * Mon Jun 30 2025 Wim Taymans <wtaymans@redhat.com> - 1.4-6-1
 - Update version to 1.4.6
   Resolves: DESKTOP-1857
