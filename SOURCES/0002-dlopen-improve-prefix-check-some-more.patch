@@ -1,0 +1,50 @@
+From 726f9d31440b5e28ca72b7a69a6ae6e8966986b3 Mon Sep 17 00:00:00 2001
+From: Wim Taymans <wtaymans@redhat.com>
+Date: Wed, 8 Apr 2026 12:00:04 +0200
+Subject: [PATCH 2/5] dlopen: improve prefix check some more
+
+If we pass a path /usr/libevil/mycode.so, it might have a prefix of
+/usr/lib but we should still reject it. Do thi by checking that after
+the prefix match, we start a new directory.
+---
+ spa/plugins/filter-graph/ladspa_plugin.c  | 4 ++--
+ src/modules/module-jack-tunnel/weakjack.h | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/spa/plugins/filter-graph/ladspa_plugin.c b/spa/plugins/filter-graph/ladspa_plugin.c
+index 354e779b9..32e57c90a 100644
+--- a/spa/plugins/filter-graph/ladspa_plugin.c
++++ b/spa/plugins/filter-graph/ladspa_plugin.c
+@@ -247,10 +247,10 @@ static int load_ladspa_plugin(struct plugin *impl, const char *path, const char
+ 	while ((p = split_walk(search_dirs, ":", &len, &state))) {
+ 		int namelen;
+ 
+-		if (len >= sizeof(filename))
++		if (len == 0 || len >= sizeof(filename))
+ 			continue;
+ 
+-		if (strncmp(path, p, len) == 0)
++		if (strncmp(path, p, len) == 0 && path[len] == '/')
+ 			namelen = snprintf(filename, sizeof(filename), "%s", path);
+ 		else
+ 			namelen = snprintf(filename, sizeof(filename), "%.*s/%s.so", (int) len, p, path);
+diff --git a/src/modules/module-jack-tunnel/weakjack.h b/src/modules/module-jack-tunnel/weakjack.h
+index 19537dbff..7e621bffb 100644
+--- a/src/modules/module-jack-tunnel/weakjack.h
++++ b/src/modules/module-jack-tunnel/weakjack.h
+@@ -175,10 +175,10 @@ static inline int weakjack_load(struct weakjack *jack, const char *lib)
+ 	while ((p = pw_split_walk(search_dirs, ":", &len, &state))) {
+ 		int pathlen;
+ 
+-		if (len >= sizeof(path))
++		if (len == 0 || len >= sizeof(path))
+ 			continue;
+ 
+-		if (strncmp(lib, p, len) == 0)
++		if (strncmp(lib, p, len) == 0 && lib[len] == '/')
+ 			pathlen = snprintf(path, sizeof(path), "%s", lib);
+ 		else
+ 			pathlen = snprintf(path, sizeof(path), "%.*s/%s", (int) len, p, lib);
+-- 
+2.54.0
+
