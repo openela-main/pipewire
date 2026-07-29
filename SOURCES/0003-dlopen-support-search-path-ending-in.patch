@@ -1,0 +1,42 @@
+From 142d3d7896a28f6426a887f5e2b569f0151bac40 Mon Sep 17 00:00:00 2001
+From: Wim Taymans <wtaymans@redhat.com>
+Date: Mon, 13 Apr 2026 10:26:33 +0200
+Subject: [PATCH 3/5] dlopen: support search path ending in /
+
+When the search path is /usr/lib/, /usr/lib/foo.so fails to load because
+there is no / after the search path. Fix this by requiring that either
+the search path end with / or the following char is a /.
+---
+ spa/plugins/filter-graph/ladspa_plugin.c  | 2 +-
+ src/modules/module-jack-tunnel/weakjack.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/spa/plugins/filter-graph/ladspa_plugin.c b/spa/plugins/filter-graph/ladspa_plugin.c
+index 32e57c90a..9274e69c4 100644
+--- a/spa/plugins/filter-graph/ladspa_plugin.c
++++ b/spa/plugins/filter-graph/ladspa_plugin.c
+@@ -250,7 +250,7 @@ static int load_ladspa_plugin(struct plugin *impl, const char *path, const char
+ 		if (len == 0 || len >= sizeof(filename))
+ 			continue;
+ 
+-		if (strncmp(path, p, len) == 0 && path[len] == '/')
++		if (strncmp(path, p, len) == 0 && (path[len-1] == '/' || path[len] == '/'))
+ 			namelen = snprintf(filename, sizeof(filename), "%s", path);
+ 		else
+ 			namelen = snprintf(filename, sizeof(filename), "%.*s/%s.so", (int) len, p, path);
+diff --git a/src/modules/module-jack-tunnel/weakjack.h b/src/modules/module-jack-tunnel/weakjack.h
+index 7e621bffb..3bb0dd17e 100644
+--- a/src/modules/module-jack-tunnel/weakjack.h
++++ b/src/modules/module-jack-tunnel/weakjack.h
+@@ -178,7 +178,7 @@ static inline int weakjack_load(struct weakjack *jack, const char *lib)
+ 		if (len == 0 || len >= sizeof(path))
+ 			continue;
+ 
+-		if (strncmp(lib, p, len) == 0 && lib[len] == '/')
++		if (strncmp(lib, p, len) == 0 && (lib[len-1] == '/' || lib[len] == '/'))
+ 			pathlen = snprintf(path, sizeof(path), "%s", lib);
+ 		else
+ 			pathlen = snprintf(path, sizeof(path), "%.*s/%s", (int) len, p, lib);
+-- 
+2.54.0
+

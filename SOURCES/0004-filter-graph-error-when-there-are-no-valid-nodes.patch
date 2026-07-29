@@ -1,0 +1,51 @@
+From 925e071a260b28e79645d65393d7cdd8b883d8fa Mon Sep 17 00:00:00 2001
+From: Wim Taymans <wtaymans@redhat.com>
+Date: Thu, 7 May 2026 13:30:41 +0200
+Subject: [PATCH 4/5] filter-graph: error when there are no valid nodes
+
+The nodes might have failed to load or there was an empty array or the
+array did not contain objects.
+---
+ spa/plugins/filter-graph/filter-graph.c | 5 ++++-
+ src/modules/module-filter-chain.c       | 2 +-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/spa/plugins/filter-graph/filter-graph.c b/spa/plugins/filter-graph/filter-graph.c
+index eaaebe3f2..b83a6b1da 100644
+--- a/spa/plugins/filter-graph/filter-graph.c
++++ b/spa/plugins/filter-graph/filter-graph.c
+@@ -2092,6 +2092,10 @@ static int load_graph(struct graph *graph, const struct spa_dict *props)
+ 		if ((res = load_node(graph, &it[1])) < 0)
+ 			return res;
+ 	}
++	if (spa_list_is_empty(&graph->node_list)) {
++		spa_log_error(impl->log, "filter.graph has no nodes");
++		return -EINVAL;
++	}
+ 	if (plinks != NULL) {
+ 		while (spa_json_enter_object(plinks, &it[1]) > 0) {
+ 			if ((res = parse_link(graph, &it[1])) < 0)
+@@ -2144,7 +2148,6 @@ static int load_graph(struct graph *graph, const struct spa_dict *props)
+ 	else
+ 		graph->default_outputs = last->desc->n_output;
+ 
+-
+ 	return 0;
+ }
+ 
+diff --git a/src/modules/module-filter-chain.c b/src/modules/module-filter-chain.c
+index 764cd481a..cedeb675e 100644
+--- a/src/modules/module-filter-chain.c
++++ b/src/modules/module-filter-chain.c
+@@ -1191,7 +1191,7 @@ static const struct pw_stream_events out_stream_events = {
+ 
+ static int setup_streams(struct impl *impl)
+ {
+-	int res;
++	int res = 0;
+ 	uint32_t i, n_params, *offs;
+ 	struct pw_array offsets;
+ 	const struct spa_pod **params = NULL;
+-- 
+2.54.0
+

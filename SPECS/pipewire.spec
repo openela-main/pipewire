@@ -1,6 +1,6 @@
 %global majorversion 1
 %global minorversion 4
-%global microversion 9
+%global microversion 11
 
 %global apiversion   0.3
 %global spaversion   0.2
@@ -80,6 +80,11 @@ Source0:        https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/%{ver
 Source1:        pipewire.sysusers
 
 ## upstream patches
+Patch0001:      0001-only-dlopen-from-the-defined-search-paths.patch
+Patch0002:      0002-dlopen-improve-prefix-check-some-more.patch
+Patch0003:      0003-dlopen-support-search-path-ending-in.patch
+Patch0004:      0004-filter-graph-error-when-there-are-no-valid-nodes.patch
+Patch0005:      0005-filter-graph-relax-LADSPA-plugin-loading.patch
 
 ## upstreamable patches
 
@@ -913,6 +918,11 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %changelog
+* Fri May 15 2026 Wim Taymans <wtaymans@redhat.com> - 1.4.11-1
+- Rebase to 1.4.11
+- Add fixes for CVE-2026-5674
+  Resolves: RHEL-164828
+
 * Fri Nov 21 2025 Wim Taymans <wtaymans@redhat.com> - 1.4.9-1
 - Rebase to 1.4.9
   Resolves: RHEL-123614
