@@ -67,7 +67,7 @@
 Name:           pipewire
 Summary:        Media Sharing Server
 Version:        %{majorversion}.%{minorversion}.%{microversion}
-Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}
+Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}.1
 License:        MIT
 URL:            https://pipewire.org/
 %if 0%{?snapdate}
@@ -83,6 +83,10 @@ Patch0002:      0002-dlopen-improve-prefix-check-some-more.patch
 Patch0003:      0003-dlopen-support-search-path-ending-in.patch
 Patch0004:      0004-filter-graph-error-when-there-are-no-valid-nodes.patch
 Patch0005:      0005-filter-graph-relax-LADSPA-plugin-loading.patch
+
+# CVE-2026-14324
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/87ee525b0124755ccab99d873ddf85d9d4969f73
+Patch0006:      pipewire-1.4.11-CVE-2026-14324.patch
 
 ## upstreamable patches
 
@@ -912,6 +916,11 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %changelog
+* Thu Aug 27 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.1
+- Fix CVE-2026-14324: limit RTSP Content-Length and check
+  allocation in RAOP client
+  Resolves: RHEL-249305
+
 * Fri May 15 2026 Wim Taymans <wtaymans@redhat.com> - 1.4.11-1
 - Rebase to 1.4.11
 - Add fixes for CVE-2026-5674
