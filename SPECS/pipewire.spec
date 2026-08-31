@@ -69,7 +69,7 @@
 Name:           pipewire
 Summary:        Media Sharing Server
 Version:        %{majorversion}.%{minorversion}.%{microversion}
-Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}
+Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}.2
 License:        MIT
 URL:            https://pipewire.org/
 %if 0%{?snapdate}
@@ -86,9 +86,16 @@ Patch0003:      0003-dlopen-support-search-path-ending-in.patch
 Patch0004:      0004-filter-graph-error-when-there-are-no-valid-nodes.patch
 Patch0005:      0005-filter-graph-relax-LADSPA-plugin-loading.patch
 
+# CVE-2026-14330
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/00413a3263a65ccaba082a533078da7cd8ac3315
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/a6155387da106b60b63eb5ee37d138d0fd89a63e
+Patch0006:      pipewire-1.4.11-CVE-2026-14330.patch
+
 ## upstreamable patches
 
 ## RHEL patches
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/87ee525b0124755ccab99d873ddf85d9d4969f73
+Patch0007:      pipewire-1.4.11-CVE-2026-14324.patch
 
 BuildRequires:  gettext
 BuildRequires:  meson >= 0.59.0
@@ -918,6 +925,15 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %changelog
+* Thu Aug 27 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.2
+- Fix CVE-2026-14324: limit RTSP Content-Length in RAOP client
+  Resolves: RHEL-249297
+
+* Thu Aug 27 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.1
+- Fix stack exhaustion via unbounded alloca in pulse-server
+  (CVE-2026-14330)
+  Resolves: RHEL-249317
+
 * Fri May 15 2026 Wim Taymans <wtaymans@redhat.com> - 1.4.11-1
 - Rebase to 1.4.11
 - Add fixes for CVE-2026-5674
