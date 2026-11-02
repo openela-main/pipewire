@@ -67,7 +67,7 @@
 Name:           pipewire
 Summary:        Media Sharing Server
 Version:        %{majorversion}.%{minorversion}.%{microversion}
-Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}.1
+Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}.2
 License:        MIT
 URL:            https://pipewire.org/
 %if 0%{?snapdate}
@@ -87,6 +87,10 @@ Patch0005:      0005-filter-graph-relax-LADSPA-plugin-loading.patch
 # CVE-2026-14324
 # https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/87ee525b0124755ccab99d873ddf85d9d4969f73
 Patch0006:      pipewire-1.4.11-CVE-2026-14324.patch
+
+# CVE-2026-14330
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/00413a3263a65ccaba082a533078da7cd8ac3315
+Patch0007:      pipewire-1.4.11-CVE-2026-14330.patch
 
 ## upstreamable patches
 
@@ -916,6 +920,10 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %changelog
+* Fri Oct 30 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.2
+- CVE-2026-14330 pipewire: Pulse Server alloca Stack Overflow
+  Resolves: RHEL-296741
+
 * Thu Aug 27 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.1
 - Fix CVE-2026-14324: limit RTSP Content-Length and check
   allocation in RAOP client
