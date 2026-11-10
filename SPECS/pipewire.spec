@@ -67,7 +67,7 @@
 Name:           pipewire
 Summary:        Media Sharing Server
 Version:        %{majorversion}.%{minorversion}.%{microversion}
-Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}%{?dist}.2
+Release:        %{baserelease}%{?snapdate:.%{snapdate}git%{shortcommit}}.1.1%{?dist}
 License:        MIT
 URL:            https://pipewire.org/
 %if 0%{?snapdate}
@@ -84,13 +84,15 @@ Patch0003:      0003-dlopen-support-search-path-ending-in.patch
 Patch0004:      0004-filter-graph-error-when-there-are-no-valid-nodes.patch
 Patch0005:      0005-filter-graph-relax-LADSPA-plugin-loading.patch
 
-# CVE-2026-14324
-# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/87ee525b0124755ccab99d873ddf85d9d4969f73
-Patch0006:      pipewire-1.4.11-CVE-2026-14324.patch
-
 # CVE-2026-14330
 # https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/00413a3263a65ccaba082a533078da7cd8ac3315
-Patch0007:      pipewire-1.4.11-CVE-2026-14330.patch
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/a6155387da106b60b63eb5ee37d138d0fd89a63e
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/d60ae4a1df2f59c534be8813809e116cc969ebb3
+Patch0006:      pipewire-1.4.11-CVE-2026-14330.patch
+
+# CVE-2026-14324
+# https://gitlab.freedesktop.org/pipewire/pipewire/-/commit/87ee525b0124755ccab99d873ddf85d9d4969f73
+Patch0007:      pipewire-1.4.11-CVE-2026-14324.patch
 
 ## upstreamable patches
 
@@ -920,19 +922,23 @@ systemctl --no-reload preset --global pipewire.socket >/dev/null 2>&1 || :
 %{_datadir}/pipewire/pipewire.conf.d/50-raop.conf
 
 %changelog
-* Fri Oct 30 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.2
-- CVE-2026-14330 pipewire: Pulse Server alloca Stack Overflow
-  Resolves: RHEL-296741
+* Mon Sep 07 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.1.1
+- Fix unbounded memory allocation and NULL pointer dereference in
+  RAOP RTSP client (CVE-2026-14324)
+  Resolves: RHEL-249296
 
 * Thu Aug 27 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 1.4.11-1.1
-- Fix CVE-2026-14324: limit RTSP Content-Length and check
-  allocation in RAOP client
-  Resolves: RHEL-249305
+- Fix stack exhaustion via unbounded alloca in pulse-server
+  Resolves: RHEL-249319
 
 * Fri May 15 2026 Wim Taymans <wtaymans@redhat.com> - 1.4.11-1
 - Rebase to 1.4.11
 - Add fixes for CVE-2026-5674
-  Resolves: RHEL-164823
+  Resolves: RHEL-164826
+
+* Fri Nov 21 2025 Wim Taymans <wtaymans@redhat.com> - 1.4.9-1
+- Rebase to 1.4.9
+  Resolves: RHEL-129575
 
 * Mon Jun 30 2025 Wim Taymans <wtaymans@redhat.com> - 1.4-6-1
 - Update version to 1.4.6
